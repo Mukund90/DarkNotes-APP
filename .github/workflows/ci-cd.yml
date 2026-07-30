@@ -1,0 +1,111 @@
+name: Build & Deploy to Amazon EKS
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+  NAMESPACE: ${{ secrets.K8S_NAMESPACE }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      ####################################################
+      # Configure AWS
+      ####################################################
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      ####################################################
+      # Login to Amazon ECR
+      ####################################################
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      ####################################################
+      # Build Backend Image
+      ####################################################
+
+      - name: Build Backend Docker Image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
+            ./backend
+
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      ####################################################
+      # Build Frontend Image
+      ####################################################
+
+      - name: Build Frontend Docker Image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: |
+          docker build \
+            --build-arg VITE_API_URL=$VITE_API_URL \
+            -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
+            ./frontend
+
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      ####################################################
+      # Configure kubectl
+      ####################################################
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --name $CLUSTER_NAME \
+            --region $AWS_REGION
+
+      ####################################################
+      # Create / Update Kubernetes Secret
+      ####################################################
+
+      - name: Create Kubernetes Secret
+        run: |
+          kubectl create secret generic darknotes-secret \
+            --namespace $NAMESPACE \
+            --from-literal=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            --from-literal=SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      ####################################################
+      # Deploy using Helm
+      ####################################################
+
+      - name: Deploy to Amazon EKS
+        run: |
+          helm upgrade --install darknotes ./darknotes \
+            --namespace $NAMESPACE \
+            --create-namespace \
+            --set backend.image.repository=${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPOSITORY }} \
+            --set backend.image.tag=${{ github.sha }} \
+            --set frontend.image.repository=${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPOSITORY }} \
+            --set frontend.image.tag=${{ github.sha }}
