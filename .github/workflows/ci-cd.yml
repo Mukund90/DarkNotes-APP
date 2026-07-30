@@ -135,7 +135,6 @@ jobs:
 
       ####################################################
       # Verify Deployment
-      ####################################################
       - name: Verify Deployment
         run: |
           kubectl get pods -n "$NAMESPACE"
