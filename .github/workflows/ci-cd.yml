@@ -34,7 +34,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      ####################################################
+      
       # Verify AWS Identity
       ####################################################
       - name: Verify AWS Identity
