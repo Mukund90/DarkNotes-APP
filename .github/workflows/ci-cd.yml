@@ -99,7 +99,7 @@ jobs:
 
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
 
-      
+      ####################################################
       # Debug EKS
       ####################################################
       - name: Debug EKS
@@ -135,17 +135,6 @@ jobs:
           kubectl get nodes
 
       ####################################################
-      # Create Secret
-      ####################################################
-      - name: Create Kubernetes Secret
-        run: |
-          kubectl create secret generic darknotes-secret \
-            --namespace "$NAMESPACE" \
-            --from-literal=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
-            --from-literal=SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-      ####################################################
       # Helm Deploy
       ####################################################
       - name: Deploy using Helm
@@ -156,13 +145,14 @@ jobs:
             --set backend.image.repository="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPOSITORY }}" \
             --set backend.image.tag="${{ github.sha }}" \
             --set frontend.image.repository="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPOSITORY }}" \
-            --set frontend.image.tag="${{ github.sha }}"
+            --set frontend.image.tag="${{ github.sha }}" \
+            --set secret.supabaseUrl="${{ secrets.SUPABASE_URL }}" \
+            --set secret.supabaseServiceRoleKey="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
 
-      
+      ####################################################
       # Verify Deployment
       ####################################################
       - name: Verify Deployment
         run: |
-          kubectl get pods -n "$NAMESPACE"
-          kubectl get svc -n "$NAMESPACE"
+          kubectl get all -n "$NAMESPACE"
           kubectl get ingress -n "$NAMESPACE"
