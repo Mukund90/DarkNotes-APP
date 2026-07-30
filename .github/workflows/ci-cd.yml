@@ -158,7 +158,7 @@ jobs:
             --set frontend.image.repository="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPOSITORY }}" \
             --set frontend.image.tag="${{ github.sha }}"
 
-      ####################################################
+      
       # Verify Deployment
       ####################################################
       - name: Verify Deployment
