@@ -1,0 +1,70 @@
+backend:
+  replicaCount: 3
+
+  image:
+    repository: 078426575246.dkr.ecr.ap-south-1.amazonaws.com/darknotes/darknotes-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 5000
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+frontend:
+  replicaCount: 3
+
+  image:
+    repository: 078426575246.dkr.ecr.ap-south-1.amazonaws.com/darknotes/darknotes-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+config:
+  nodeEnv: "production"
+  port: "5000"
+  apiPrefix: "/api"
+
+secret:
+  # Leave these empty in Git.
+  # Set them through --set or GitHub Actions if Helm manages the Secret.
+  supabaseUrl: ""
+  supabaseServiceRoleKey: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+ingress:
+  enabled: true
+  className: alb
+
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /
+
+  host: ""
