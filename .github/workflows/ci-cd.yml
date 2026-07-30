@@ -18,13 +18,15 @@ jobs:
       contents: read
 
     steps:
+      ####################################################
+      # Checkout
+      ####################################################
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       ####################################################
-      # Configure AWS
+      # Configure AWS Credentials
       ####################################################
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -35,31 +37,47 @@ jobs:
       ####################################################
       # Login to Amazon ECR
       ####################################################
-
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       ####################################################
+      # Verify Repository Structure
+      ####################################################
+      - name: Verify Project Structure
+        run: |
+          pwd
+          ls -la
+          ls -la backend
+          ls -la frontend
+          ls -la darknotes
+
+      ####################################################
       # Build Backend Image
       ####################################################
-
       - name: Build Backend Docker Image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build \
-            -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
-            ./backend
+          set -euo pipefail
 
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          echo "Registry: $REGISTRY"
+          echo "Repository: $REPOSITORY"
+          echo "Image Tag: $IMAGE_TAG"
+
+          cd backend
+
+          docker build \
+            -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
+            .
+
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
 
       ####################################################
       # Build Frontend Image
       ####################################################
-
       - name: Build Frontend Docker Image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -67,31 +85,37 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
-          docker build \
-            --build-arg VITE_API_URL=$VITE_API_URL \
-            -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
-            ./frontend
+          set -euo pipefail
 
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          echo "Registry: $REGISTRY"
+          echo "Repository: $REPOSITORY"
+          echo "Image Tag: $IMAGE_TAG"
+
+          cd frontend
+
+          docker build \
+            --build-arg VITE_API_URL="$VITE_API_URL" \
+            -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
+            .
+
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
 
       ####################################################
       # Configure kubectl
       ####################################################
-
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig \
-            --name $CLUSTER_NAME \
-            --region $AWS_REGION
+            --name "$CLUSTER_NAME" \
+            --region "$AWS_REGION"
 
       ####################################################
-      # Create / Update Kubernetes Secret
+      # Create / Update Secret
       ####################################################
-
       - name: Create Kubernetes Secret
         run: |
           kubectl create secret generic darknotes-secret \
-            --namespace $NAMESPACE \
+            --namespace "$NAMESPACE" \
             --from-literal=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
             --from-literal=SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -99,13 +123,21 @@ jobs:
       ####################################################
       # Deploy using Helm
       ####################################################
-
       - name: Deploy to Amazon EKS
         run: |
           helm upgrade --install darknotes ./darknotes \
-            --namespace $NAMESPACE \
+            --namespace "$NAMESPACE" \
             --create-namespace \
-            --set backend.image.repository=${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPOSITORY }} \
-            --set backend.image.tag=${{ github.sha }} \
-            --set frontend.image.repository=${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPOSITORY }} \
-            --set frontend.image.tag=${{ github.sha }}
+            --set backend.image.repository="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPOSITORY }}" \
+            --set backend.image.tag="${{ github.sha }}" \
+            --set frontend.image.repository="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPOSITORY }}" \
+            --set frontend.image.tag="${{ github.sha }}"
+
+      ####################################################
+      # Verify Deployment
+      ####################################################
+      - name: Verify Deployment
+        run: |
+          kubectl get pods -n "$NAMESPACE"
+          kubectl get svc -n "$NAMESPACE"
+          kubectl get ingress -n "$NAMESPACE"
