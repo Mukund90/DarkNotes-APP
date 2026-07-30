@@ -99,7 +99,7 @@ jobs:
 
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
 
-      ####################################################
+      
       # Debug EKS
       ####################################################
       - name: Debug EKS
