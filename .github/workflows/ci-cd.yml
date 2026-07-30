@@ -19,12 +19,12 @@ jobs:
 
     steps:
       ####################################################
-      # Checkout
+      # Checkout Repository
       ####################################################
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      
+      ####################################################
       # Configure AWS Credentials
       ####################################################
       - name: Configure AWS Credentials
@@ -34,7 +34,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      
+      ####################################################
+      # Verify AWS Identity
+      ####################################################
+      - name: Verify AWS Identity
+        run: |
+          aws sts get-caller-identity
+
+      ####################################################
       # Login to Amazon ECR
       ####################################################
       - name: Login to Amazon ECR
@@ -44,7 +51,7 @@ jobs:
       ####################################################
       # Verify Repository Structure
       ####################################################
-      - name: Verify Project Structure
+      - name: Verify Repository Structure
         run: |
           pwd
           ls -la
@@ -53,7 +60,7 @@ jobs:
           ls -la darknotes
 
       ####################################################
-      # Build Backend Image
+      # Build Backend
       ####################################################
       - name: Build Backend Docker Image
         env:
@@ -62,10 +69,6 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
-
-          echo "Registry: $REGISTRY"
-          echo "Repository: $REPOSITORY"
-          echo "Image Tag: $IMAGE_TAG"
 
           cd backend
 
@@ -76,7 +79,7 @@ jobs:
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
 
       ####################################################
-      # Build Frontend Image
+      # Build Frontend
       ####################################################
       - name: Build Frontend Docker Image
         env:
@@ -86,10 +89,6 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
           set -euo pipefail
-
-          echo "Registry: $REGISTRY"
-          echo "Repository: $REPOSITORY"
-          echo "Image Tag: $IMAGE_TAG"
 
           cd frontend
 
@@ -101,6 +100,24 @@ jobs:
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
 
       ####################################################
+      # Debug EKS
+      ####################################################
+      - name: Debug EKS
+        run: |
+          echo "AWS_REGION=[$AWS_REGION]"
+          echo "CLUSTER_NAME=[$CLUSTER_NAME]"
+          echo "NAMESPACE=[$NAMESPACE]"
+
+          aws sts get-caller-identity
+
+          aws eks list-clusters \
+            --region "$AWS_REGION"
+
+          aws eks describe-cluster \
+            --name "$CLUSTER_NAME" \
+            --region "$AWS_REGION"
+
+      ####################################################
       # Configure kubectl
       ####################################################
       - name: Configure kubectl
@@ -110,7 +127,15 @@ jobs:
             --region "$AWS_REGION"
 
       ####################################################
-      # Create / Update Secret
+      # Verify kubectl
+      ####################################################
+      - name: Verify kubectl
+        run: |
+          kubectl config current-context
+          kubectl get nodes
+
+      ####################################################
+      # Create Secret
       ####################################################
       - name: Create Kubernetes Secret
         run: |
@@ -121,9 +146,9 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       ####################################################
-      # Deploy using Helm
+      # Helm Deploy
       ####################################################
-      - name: Deploy to Amazon EKS
+      - name: Deploy using Helm
         run: |
           helm upgrade --install darknotes ./darknotes \
             --namespace "$NAMESPACE" \
@@ -135,6 +160,7 @@ jobs:
 
       ####################################################
       # Verify Deployment
+      ####################################################
       - name: Verify Deployment
         run: |
           kubectl get pods -n "$NAMESPACE"
