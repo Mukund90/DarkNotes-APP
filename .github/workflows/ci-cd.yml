@@ -11,46 +11,22 @@ env:
   NAMESPACE: ${{ secrets.K8S_NAMESPACE }}
 
 jobs:
-  deploy:
+
+  ####################################################
+  # BUILD JOB
+  ####################################################
+  build:
+    name: Build Docker Images
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
 
     steps:
-      ####################################################
-      # Checkout Repository
-      ####################################################
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      ####################################################
-      # Configure AWS Credentials
-      ####################################################
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      
-      # Verify AWS Identity
-      ####################################################
-      - name: Verify AWS Identity
-        run: |
-          aws sts get-caller-identity
-
-      ####################################################
-      # Login to Amazon ECR
-      ####################################################
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      ####################################################
-      # Verify Repository Structure
-      ####################################################
       - name: Verify Repository Structure
         run: |
           pwd
@@ -59,49 +35,97 @@ jobs:
           ls -la frontend
           ls -la darknotes
 
-      ####################################################
-      # Build Backend
-      ####################################################
-      - name: Build Backend Docker Image
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
+      # Build Backend Image
+
+      # Build Frontend Image
+
+      # Save Backend Image
+      # docker save backend.tar
+
+      # Save Frontend Image
+      # docker save frontend.tar
+
+      # Upload Backend Artifact
+
+      # Upload Frontend Artifact
+
+
+  ####################################################
+  # PUSH JOB
+  ####################################################
+  push:
+    name: Push Images to Amazon ECR
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+
+      # Download Backend Artifact
+
+      # Download Frontend Artifact
+
+      # docker load backend.tar
+
+      # docker load frontend.tar
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS Identity
         run: |
-          set -euo pipefail
+          aws sts get-caller-identity
 
-          cd backend
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-          docker build \
-            -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
-            .
+      # Tag Backend Image
 
-          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+      # Tag Frontend Image
 
-      ####################################################
-      # Build Frontend
-      ####################################################
-      - name: Build Frontend Docker Image
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: |
-          set -euo pipefail
+      # Push Backend Image
 
-          cd frontend
+      # Push Frontend Image
 
-          docker build \
-            --build-arg VITE_API_URL="$VITE_API_URL" \
-            -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
-            .
 
-          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+  ####################################################
+  # DEPLOY JOB
+  ####################################################
+  deploy:
+    name: Deploy to Amazon EKS
 
-      ####################################################
-      # Debug EKS
-      ####################################################
+    needs: push
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Debug EKS
         run: |
           echo "AWS_REGION=[$AWS_REGION]"
@@ -117,27 +141,18 @@ jobs:
             --name "$CLUSTER_NAME" \
             --region "$AWS_REGION"
 
-      ####################################################
-      # Configure kubectl
-      ####################################################
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig \
             --name "$CLUSTER_NAME" \
             --region "$AWS_REGION"
 
-      ####################################################
-      # Verify kubectl
-      ####################################################
       - name: Verify kubectl
         run: |
           kubectl config current-context
           kubectl get nodes
 
-      ####################################################
-      # Helm Deploy
-      ####################################################
-      - name: Deploy using Helm
+      - name: Helm Deploy
         run: |
           helm upgrade --install darknotes ./darknotes \
             --namespace "$NAMESPACE" \
@@ -149,9 +164,6 @@ jobs:
             --set secret.supabaseUrl="${{ secrets.SUPABASE_URL }}" \
             --set secret.supabaseServiceRoleKey="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
 
-      ####################################################
-      # Verify Deployment
-      ####################################################
       - name: Verify Deployment
         run: |
           kubectl get all -n "$NAMESPACE"
