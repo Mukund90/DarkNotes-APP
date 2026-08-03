@@ -61,4 +61,4 @@ ingress:
 
   annotations: {}
 
-  host: "darknotes.local"
+  host: "localhost"
