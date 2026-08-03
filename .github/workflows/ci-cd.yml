@@ -1,14 +1,9 @@
-name: Build & Deploy to Amazon EKS
+name: Build & Deploy to Kind
 
 on:
   push:
     branches:
       - main
-
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
-  NAMESPACE: ${{ secrets.K8S_NAMESPACE }}
 
 jobs:
 
@@ -23,7 +18,6 @@ jobs:
       contents: read
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -35,136 +29,251 @@ jobs:
           ls -la frontend
           ls -la darknotes
 
+      ####################################################
       # Build Backend Image
+      ####################################################
 
+      - name: Build Backend Image
+        run: |
+          docker build \
+            -t mudocker67/darknotes-backend:${{ github.sha }} \
+            -t mudocker67/darknotes-backend:latest \
+            ./backend
+
+      ####################################################
       # Build Frontend Image
+      ####################################################
 
-      # Save Backend Image
-      # docker save backend.tar
+      - name: Build Frontend Image
+        run: |
+          docker build \
+            -t mudocker67/darknotes-frontend:${{ github.sha }} \
+            -t mudocker67/darknotes-frontend:latest \
+            ./frontend
 
-      # Save Frontend Image
-      # docker save frontend.tar
+      ####################################################
+      # Save Docker Images
+      ####################################################
 
-      # Upload Backend Artifact
+      - name: Save Backend Image
+        run: |
+          docker save \
+            -o backend.tar \
+            mudocker67/darknotes-backend:${{ github.sha }}
 
-      # Upload Frontend Artifact
+      - name: Save Frontend Image
+        run: |
+          docker save \
+            -o frontend.tar \
+            mudocker67/darknotes-frontend:${{ github.sha }}
 
+      ####################################################
+      # Upload Artifacts
+      ####################################################
+
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-image
+          path: backend.tar
+
+      - name: Upload Frontend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-image
+          path: frontend.tar
 
   ####################################################
   # PUSH JOB
   ####################################################
   push:
-    name: Push Images to Amazon ECR
-
+    name: Push Images to Docker Hub
     needs: build
-
     runs-on: self-hosted
 
     permissions:
       contents: read
 
     steps:
+      ####################################################
+      # Download Backend Image
+      ####################################################
 
-      # Download Backend Artifact
-
-      # Download Frontend Artifact
-
-      # docker load backend.tar
-
-      # docker load frontend.tar
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Download Backend Artifact
+        uses: actions/download-artifact@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          name: backend-image
 
-      - name: Verify AWS Identity
-        run: |
-          aws sts get-caller-identity
+      ####################################################
+      # Download Frontend Image
+      ####################################################
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Download Frontend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-image
 
-      # Tag Backend Image
+      ####################################################
+      # Load Docker Images
+      ####################################################
 
-      # Tag Frontend Image
+      - name: Load Backend Image
+        run: docker load -i backend.tar
 
+      - name: Load Frontend Image
+        run: docker load -i frontend.tar
+
+      ####################################################
+      # Login Docker Hub
+      ####################################################
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWD}}
+
+      ####################################################
       # Push Backend Image
+      ####################################################
 
+      - name: Push Backend Image
+        run: |
+          docker push mudocker67/darknotes-backend:${{ github.sha }}
+          docker push mudocker67/darknotes-backend:latest
+
+      ####################################################
       # Push Frontend Image
+      ####################################################
 
+      - name: Push Frontend Image
+        run: |
+          docker push mudocker67/darknotes-frontend:${{ github.sha }}
+          docker push mudocker67/darknotes-frontend:latest
 
   ####################################################
   # DEPLOY JOB
   ####################################################
   deploy:
-    name: Deploy to Amazon EKS
-
+    name: Deploy to Kind Cluster
     needs: push
-
     runs-on: self-hosted
 
     permissions:
       contents: read
 
     steps:
+      ####################################################
+      # Checkout Repository
+      ####################################################
 
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+      ####################################################
+      # Verify Kubernetes Context
+      ####################################################
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Debug EKS
+      - name: Verify Kubernetes Context
         run: |
-          echo "AWS_REGION=[$AWS_REGION]"
-          echo "CLUSTER_NAME=[$CLUSTER_NAME]"
-          echo "NAMESPACE=[$NAMESPACE]"
-
-          aws sts get-caller-identity
-
-          aws eks list-clusters \
-            --region "$AWS_REGION"
-
-          aws eks describe-cluster \
-            --name "$CLUSTER_NAME" \
-            --region "$AWS_REGION"
-
-      - name: Configure kubectl
-        run: |
-          aws eks update-kubeconfig \
-            --name "$CLUSTER_NAME" \
-            --region "$AWS_REGION"
-
-      - name: Verify kubectl
-        run: |
+          echo "Current Context:"
           kubectl config current-context
+
+          echo ""
+          echo "Cluster Information:"
+          kubectl cluster-info
+
+          echo ""
+          echo "Nodes:"
           kubectl get nodes
 
-      - name: Helm Deploy
+      ####################################################
+      # Verify Helm
+      ####################################################
+
+      - name: Verify Helm
+        run: |
+          helm version
+          kubectl version
+
+      ####################################################
+      # Deploy using Helm
+      ####################################################
+
+      - name: Helm Upgrade / Install
         run: |
           helm upgrade --install darknotes ./darknotes \
-            --namespace "$NAMESPACE" \
+            --namespace default \
             --create-namespace \
-            --set backend.image.repository="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPOSITORY }}" \
-            --set backend.image.tag="${{ github.sha }}" \
-            --set frontend.image.repository="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPOSITORY }}" \
-            --set frontend.image.tag="${{ github.sha }}" \
+            --set backend.image.repository=mudocker67/darknotes-backend \
+            --set backend.image.tag=${{ github.sha }} \
+            --set frontend.image.repository=mudocker67/darknotes-frontend \
+            --set frontend.image.tag=${{ github.sha }} \
             --set secret.supabaseUrl="${{ secrets.SUPABASE_URL }}" \
             --set secret.supabaseServiceRoleKey="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
 
-      - name: Verify Deployment
+      ####################################################
+      # Wait for Backend Deployment
+      ####################################################
+
+      - name: Wait for Backend Rollout
         run: |
-          kubectl get all -n "$NAMESPACE"
-          kubectl get ingress -n "$NAMESPACE"
+          kubectl rollout status deployment/darknotes-backend \
+            --timeout=180s
+
+      ####################################################
+      # Wait for Frontend Deployment
+      ####################################################
+
+      - name: Wait for Frontend Rollout
+        run: |
+          kubectl rollout status deployment/darknotes-frontend \
+            --timeout=180s
+
+      ####################################################
+      # Verify Pods
+      ####################################################
+
+      - name: Verify Pods
+        run: kubectl get pods -o wide
+
+      ####################################################
+      # Verify Services
+      ####################################################
+
+      - name: Verify Services
+        run: kubectl get svc
+
+      ####################################################
+      # Verify Ingress
+      ####################################################
+
+      - name: Verify Ingress
+        run: kubectl get ingress
+
+      ####################################################
+      # Describe Ingress
+      ####################################################
+
+      - name: Describe Ingress
+        run: kubectl describe ingress darknotes
+
+      ####################################################
+      # Deployment Summary
+      ####################################################
+
+      - name: Deployment Summary
+        run: |
+          echo "========================================"
+          echo "Deployment Successful"
+          echo "========================================"
+          echo ""
+          echo "Frontend:"
+          echo "http://darknotes.local"
+          echo ""
+          echo "Backend API:"
+          echo "http://darknotes.local/api"
+          echo ""
+          kubectl get pods
+          echo ""
+          kubectl get ingress
