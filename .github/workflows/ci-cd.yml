@@ -203,7 +203,7 @@ jobs:
       - name: Helm Upgrade / Install
         run: |
           helm upgrade --install darknotes ./darknotes \
-            --namespace default \
+            --namespace dark-notes \
             --create-namespace \
             --set backend.image.repository=mudocker67/darknotes-backend \
             --set backend.image.tag=${{ github.sha }} \
