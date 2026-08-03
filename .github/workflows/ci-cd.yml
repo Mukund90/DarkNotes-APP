@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+env:
+  K8S_NAMESPACE: ${{ secrets.K8S_NAMESPACE }}
+
 jobs:
 
   ####################################################
@@ -131,7 +134,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_PASSWD}}
+          password: ${{ secrets.DOCKER_HUB_PASSWD }}
 
       ####################################################
       # Push Backend Image
@@ -203,7 +206,7 @@ jobs:
       - name: Helm Upgrade / Install
         run: |
           helm upgrade --install darknotes ./darknotes \
-            --namespace dark-notes \
+            --namespace ${{ env.K8S_NAMESPACE }} \
             --create-namespace \
             --set backend.image.repository=mudocker67/darknotes-backend \
             --set backend.image.tag=${{ github.sha }} \
@@ -219,6 +222,7 @@ jobs:
       - name: Wait for Backend Rollout
         run: |
           kubectl rollout status deployment/darknotes-backend \
+            -n ${{ env.K8S_NAMESPACE }} \
             --timeout=180s
 
       ####################################################
@@ -228,6 +232,7 @@ jobs:
       - name: Wait for Frontend Rollout
         run: |
           kubectl rollout status deployment/darknotes-frontend \
+            -n ${{ env.K8S_NAMESPACE }} \
             --timeout=180s
 
       ####################################################
@@ -235,28 +240,32 @@ jobs:
       ####################################################
 
       - name: Verify Pods
-        run: kubectl get pods -o wide
+        run: |
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -o wide
 
       ####################################################
       # Verify Services
       ####################################################
 
       - name: Verify Services
-        run: kubectl get svc
+        run: |
+          kubectl get svc -n ${{ env.K8S_NAMESPACE }}
 
       ####################################################
       # Verify Ingress
       ####################################################
 
       - name: Verify Ingress
-        run: kubectl get ingress
+        run: |
+          kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
 
       ####################################################
       # Describe Ingress
       ####################################################
 
       - name: Describe Ingress
-        run: kubectl describe ingress darknotes
+        run: |
+          kubectl describe ingress darknotes -n ${{ env.K8S_NAMESPACE }}
 
       ####################################################
       # Deployment Summary
@@ -268,12 +277,19 @@ jobs:
           echo "Deployment Successful"
           echo "========================================"
           echo ""
+          echo "Namespace: ${{ env.K8S_NAMESPACE }}"
+          echo ""
           echo "Frontend:"
           echo "http://darknotes.local"
           echo ""
           echo "Backend API:"
           echo "http://darknotes.local/api"
           echo ""
-          kubectl get pods
+          echo "Pods:"
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }}
           echo ""
-          kubectl get ingress
+          echo "Services:"
+          kubectl get svc -n ${{ env.K8S_NAMESPACE }}
+          echo ""
+          echo "Ingress:"
+          kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
