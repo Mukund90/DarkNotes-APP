@@ -2,9 +2,9 @@ backend:
   replicaCount: 3
 
   image:
-    repository: 078426575246.dkr.ecr.ap-south-1.amazonaws.com/darknotes/darknotes-backend
+    repository: mudocker67/darknotes-backend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   service:
     type: ClusterIP
@@ -23,9 +23,9 @@ frontend:
   replicaCount: 3
 
   image:
-    repository: 078426575246.dkr.ecr.ap-south-1.amazonaws.com/darknotes/darknotes-frontend
+    repository: mudocker67/darknotes-frontend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   service:
     type: ClusterIP
@@ -46,8 +46,6 @@ config:
   apiPrefix: "/api"
 
 secret:
-  # Leave these empty in Git.
-  # Set them through --set or GitHub Actions if Helm manages the Secret.
   supabaseUrl: ""
   supabaseServiceRoleKey: ""
 
@@ -59,12 +57,8 @@ serviceAccount:
 
 ingress:
   enabled: true
-  className: alb
+  className: nginx
 
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /
+  annotations: {}
 
-  host: ""
+  host: "darknotes.local"
