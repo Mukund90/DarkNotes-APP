@@ -1,7 +1,5 @@
 process.env.NODE_ENV = 'test';
 
-// REMOVED the require('vitest') line entirely
-
 const request = require('supertest');
 const app = require('../server');
 
