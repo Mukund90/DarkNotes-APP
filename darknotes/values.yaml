@@ -60,20 +60,4 @@ ingress:
   className: nginx
 
   annotations: {}# ==========================================
-# Monitoring Stack Configs (Loki, Promtail, Grafana)
-# ==========================================
-loki:
-  auth_enabled: false
-  deploymentMode: SingleBinary
 
-promtail:
-  config:
-    clients:
-      # Automatically targets the Loki service created by your deployment release name
-      - url: http://{{ .Release.Name }}-loki-gateway/loki/api/v1/push
-
-grafana:
-  enabled: true
-  adminPassword: "admin" # Default dashboard password for testing
-  persistence:
-    enabled: false # Keeps it lightweight using temporary cluster storage
