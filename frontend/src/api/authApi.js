@@ -1,10 +1,12 @@
 const API_URL = '';
+import { generateCorrelationId } from '../utils/correlationId';
 
 export async function signup(email, password) {
   const res = await fetch(`${API_URL}/api/auth/signup`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Correlation-ID': generateCorrelationId(),
     },
     body: JSON.stringify({ email, password }),
   });
@@ -23,6 +25,7 @@ export async function login(email, password) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Correlation-ID': generateCorrelationId(),
     },
     body: JSON.stringify({ email, password }),
   });
@@ -41,6 +44,7 @@ export async function logout(token) {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
+      'X-Correlation-ID': generateCorrelationId(),
     },
   });
 
