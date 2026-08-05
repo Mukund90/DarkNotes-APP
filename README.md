@@ -113,6 +113,19 @@ No installation needed — DarkNotes works directly in your browser (Chrome, Fir
 5. Log out
    Click the Logout button in the top-right corner of the navbar at any time
 
+   # 📌 API Endpoints
+
+The following REST API endpoints are available in the application.
+
+| Method     | Endpoint               | Description                                     |
+| ---------- | ---------------------- | ----------------------------------------------- |
+| **POST**   | `/api/auth/login`      | Authenticate a user and return an access token. |
+| **POST**   | `/api/auth/logout`     | Log out the authenticated user.                 |
+| **GET**    | `/api/notes`           | Retrieve all notes for the authenticated user.  |
+| **POST**   | `/api/notes`           | Create a new note.                              |
+| **PUT**    | `/api/notes/:notes_id` | Update an existing note.                        |
+| **DELETE** | `/api/notes/:notes_id` | Delete a note by its ID.                        |
+
 # Architecture
 
 ![DarkNotes Architecture](docs/images/ThreeTierArchitecture.png)
