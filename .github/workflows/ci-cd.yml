@@ -155,185 +155,185 @@ jobs:
           docker push mudocker67/darknotes-frontend:latest
 
   ####################################################
-# DEPLOY JOB
-####################################################
-deploy:
-  name: Deploy to Kind Cluster
-  needs: push
-  runs-on: self-hosted
+  # DEPLOY JOB
+  ####################################################
+  deploy:
+    name: Deploy to Kind Cluster
+    needs: push
+    runs-on: self-hosted
 
-  permissions:
-    contents: read
+    permissions:
+      contents: read
 
-  steps:
+    steps:
 
-    ####################################################
-    # Checkout Repository
-    ####################################################
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      ####################################################
+      # Checkout Repository
+      ####################################################
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    ####################################################
-    # Cache Helm Dependencies
-    ####################################################
-    - name: Cache Helm Dependencies
-      uses: actions/cache@v4
-      with:
-        path: darknotes/charts
-        key: ${{ runner.os }}-helm-${{ hashFiles('darknotes/Chart.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-helm-
+      ####################################################
+      # Cache Helm Dependencies
+      ####################################################
+      - name: Cache Helm Dependencies
+        uses: actions/cache@v4
+        with:
+          path: darknotes/charts
+          key: ${{ runner.os }}-helm-${{ hashFiles('darknotes/Chart.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-helm-
 
-    ####################################################
-    # Verify Kubernetes Context
-    ####################################################
-    - name: Verify Kubernetes Context
-      run: |
-        echo "Current Context:"
-        kubectl config current-context
+      ####################################################
+      # Verify Kubernetes Context
+      ####################################################
+      - name: Verify Kubernetes Context
+        run: |
+          echo "Current Context:"
+          kubectl config current-context
 
-        echo ""
-        echo "Cluster Information:"
-        kubectl cluster-info
+          echo ""
+          echo "Cluster Information:"
+          kubectl cluster-info
 
-        echo ""
-        echo "Nodes:"
-        kubectl get nodes
+          echo ""
+          echo "Nodes:"
+          kubectl get nodes
 
-    ####################################################
-    # Verify Helm
-    ####################################################
-    - name: Verify Helm
-      run: |
-        helm version
-        kubectl version
+      ####################################################
+      # Verify Helm
+      ####################################################
+      - name: Verify Helm
+        run: |
+          helm version
+          kubectl version
 
-    ####################################################
-    # Add Grafana Helm Repository
-    ####################################################
-    - name: Add Grafana Helm Repository
-      run: |
-        helm repo add grafana https://grafana.github.io/helm-charts
-        helm repo update
+      ####################################################
+      # Add Grafana Helm Repository
+      ####################################################
+      - name: Add Grafana Helm Repository
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
 
-    ####################################################
-    # Build Helm Dependencies
-    ####################################################
-    - name: Build Helm Dependencies
-      run: |
-        helm dependency build ./darknotes
+      ####################################################
+      # Build Helm Dependencies
+      ####################################################
+      - name: Build Helm Dependencies
+        run: |
+          helm dependency build ./darknotes
 
-    ####################################################
-    # Lint Helm Chart
-    ####################################################
-    - name: Lint Helm Chart
-      run: |
-        helm lint ./darknotes
+      ####################################################
+      # Lint Helm Chart
+      ####################################################
+      - name: Lint Helm Chart
+        run: |
+          helm lint ./darknotes
 
-    ####################################################
-    # Deploy using Helm
-    ####################################################
-    - name: Helm Upgrade / Install
-      run: |
-        helm upgrade --install darknotes ./darknotes \
-          --namespace ${{ env.K8S_NAMESPACE }} \
-          --create-namespace \
-          --set backend.image.repository=mudocker67/darknotes-backend \
-          --set backend.image.tag=${{ github.sha }} \
-          --set frontend.image.repository=mudocker67/darknotes-frontend \
-          --set frontend.image.tag=${{ github.sha }} \
-          --set secret.supabaseUrl="${{ secrets.SUPABASE_URL }}" \
-          --set secret.supabaseServiceRoleKey="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ####################################################
+      # Deploy using Helm
+      ####################################################
+      - name: Helm Upgrade / Install
+        run: |
+          helm upgrade --install darknotes ./darknotes \
+            --namespace ${{ env.K8S_NAMESPACE }} \
+            --create-namespace \
+            --set backend.image.repository=mudocker67/darknotes-backend \
+            --set backend.image.tag=${{ github.sha }} \
+            --set frontend.image.repository=mudocker67/darknotes-frontend \
+            --set frontend.image.tag=${{ github.sha }} \
+            --set secret.supabaseUrl="${{ secrets.SUPABASE_URL }}" \
+            --set secret.supabaseServiceRoleKey="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
 
-    ####################################################
-    # Wait for Backend Deployment
-    ####################################################
-    - name: Wait for Backend Rollout
-      run: |
-        kubectl rollout status deployment/darknotes-backend \
-          -n ${{ env.K8S_NAMESPACE }} \
-          --timeout=180s
+      ####################################################
+      # Wait for Backend Deployment
+      ####################################################
+      - name: Wait for Backend Rollout
+        run: |
+          kubectl rollout status deployment/darknotes-backend \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=180s
 
-    ####################################################
-    # Wait for Frontend Deployment
-    ####################################################
-    - name: Wait for Frontend Rollout
-      run: |
-        kubectl rollout status deployment/darknotes-frontend \
-          -n ${{ env.K8S_NAMESPACE }} \
-          --timeout=180s
+      ####################################################
+      # Wait for Frontend Deployment
+      ####################################################
+      - name: Wait for Frontend Rollout
+        run: |
+          kubectl rollout status deployment/darknotes-frontend \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=180s
 
-    ####################################################
-    # Verify Pods
-    ####################################################
-    - name: Verify Pods
-      run: |
-        kubectl get pods -n ${{ env.K8S_NAMESPACE }} -o wide
+      ####################################################
+      # Verify Pods
+      ####################################################
+      - name: Verify Pods
+        run: |
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -o wide
 
-    ####################################################
-    # Verify Services
-    ####################################################
-    - name: Verify Services
-      run: |
-        kubectl get svc -n ${{ env.K8S_NAMESPACE }}
+      ####################################################
+      # Verify Services
+      ####################################################
+      - name: Verify Services
+        run: |
+          kubectl get svc -n ${{ env.K8S_NAMESPACE }}
 
-    ####################################################
-    # Verify Ingress
-    ####################################################
-    - name: Verify Ingress
-      run: |
-        kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
+      ####################################################
+      # Verify Ingress
+      ####################################################
+      - name: Verify Ingress
+        run: |
+          kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
 
-    ####################################################
-    # Describe Ingress
-    ####################################################
-    - name: Describe Ingress
-      run: |
-        kubectl describe ingress darknotes -n ${{ env.K8S_NAMESPACE }}
+      ####################################################
+      # Describe Ingress
+      ####################################################
+      - name: Describe Ingress
+        run: |
+          kubectl describe ingress darknotes -n ${{ env.K8S_NAMESPACE }}
 
-    ####################################################
-    # Verify Loki
-    ####################################################
-    - name: Verify Loki
-      run: |
-        kubectl get pods -n ${{ env.K8S_NAMESPACE }} | grep loki || true
+      ####################################################
+      # Verify Loki
+      ####################################################
+      - name: Verify Loki
+        run: |
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} | grep loki || true
 
-    ####################################################
-    # Verify Promtail
-    ####################################################
-    - name: Verify Promtail
-      run: |
-        kubectl get daemonset -n ${{ env.K8S_NAMESPACE }}
+      ####################################################
+      # Verify Promtail
+      ####################################################
+      - name: Verify Promtail
+        run: |
+          kubectl get daemonset -n ${{ env.K8S_NAMESPACE }}
 
-    ####################################################
-    # Verify Grafana
-    ####################################################
-    - name: Verify Grafana
-      run: |
-        kubectl get svc -n ${{ env.K8S_NAMESPACE }} | grep grafana || true
+      ####################################################
+      # Verify Grafana
+      ####################################################
+      - name: Verify Grafana
+        run: |
+          kubectl get svc -n ${{ env.K8S_NAMESPACE }} | grep grafana || true
 
-    ####################################################
-    # Deployment Summary
-    ####################################################
-    - name: Deployment Summary
-      run: |
-        echo "========================================"
-        echo "Deployment Successful"
-        echo "========================================"
-        echo ""
-        echo "Namespace: ${{ env.K8S_NAMESPACE }}"
-        echo ""
-        echo "Frontend:"
-        echo "http://darknotes.local"
-        echo ""
-        echo "Backend API:"
-        echo "http://darknotes.local/api"
-        echo ""
-        echo "Pods:"
-        kubectl get pods -n ${{ env.K8S_NAMESPACE }}
-        echo ""
-        echo "Services:"
-        kubectl get svc -n ${{ env.K8S_NAMESPACE }}
-        echo ""
-        echo "Ingress:"
-        kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
+      ####################################################
+      # Deployment Summary
+      ####################################################
+      - name: Deployment Summary
+        run: |
+          echo "========================================"
+          echo "Deployment Successful"
+          echo "========================================"
+          echo ""
+          echo "Namespace: ${{ env.K8S_NAMESPACE }}"
+          echo ""
+          echo "Frontend:"
+          echo "http://darknotes.local"
+          echo ""
+          echo "Backend API:"
+          echo "http://darknotes.local/api"
+          echo ""
+          echo "Pods:"
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }}
+          echo ""
+          echo "Services:"
+          kubectl get svc -n ${{ env.K8S_NAMESPACE }}
+          echo ""
+          echo "Ingress:"
+          kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
