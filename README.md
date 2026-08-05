@@ -1,5 +1,3 @@
-readme.md
-readme.md
 
 # DarkNotes -- Production-Ready Three-Tier Application
 
@@ -28,7 +26,7 @@ DarkNotes/
 Open your browser and go to:
 
 ```
-http://http://k8s-app1ns-darknote-70f8703519-1933729185.ap-south-1.elb.amazonaws.com/login
+http://k8s-app1ns-darknote-70f8703519-1933729185.ap-south-1.elb.amazonaws.com/login
 ```
 
 > No installation needed — DarkNotes works directly in your browser (Chrome, Firefox, Edge, Safari) on desktop or mobile.
