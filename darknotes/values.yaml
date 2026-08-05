@@ -60,3 +60,29 @@ ingress:
   className: nginx
 
   annotations: {}
+# Monitoring Stack Configurations
+loki-distributed:
+  enabled: true
+  loki:
+    auth_enabled: false
+
+promtail:
+  enabled: true
+  config:
+    clients:
+      # Links Promtail directly to the Loki distributed gateway service inside the release
+      - url: http://{{ .Release.Name }}-loki-distributed-gateway/loki/api/v1/push
+
+grafana:
+  enabled: true
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Loki
+          type: loki
+          access: proxy
+          # Automatically adds Loki as a data source inside your new Grafana
+          url: http://{{ .Release.Name }}-loki-distributed-gateway
+          jsonData:
+            maxLines: 1000
