@@ -209,21 +209,6 @@ jobs:
           kubectl version
 
       ####################################################
-      # Add Grafana Helm Repository
-      ####################################################
-      - name: Add Grafana Helm Repository
-        run: |
-          helm repo add grafana https://grafana.github.io/helm-charts
-          helm repo update
-
-      ####################################################
-      # Build Helm Dependencies
-      ####################################################
-      - name: Build Helm Dependencies
-        run: |
-          helm dependency build ./darknotes
-
-      ####################################################
       # Lint Helm Chart
       ####################################################
       - name: Lint Helm Chart
