@@ -1,6 +1,12 @@
 backend:
   replicaCount: 3
 
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
   image:
     repository: mudocker67/darknotes-backend
     tag: latest
@@ -21,6 +27,13 @@ backend:
 
 frontend:
   replicaCount: 3
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
 
   image:
     repository: mudocker67/darknotes-frontend
@@ -60,10 +73,7 @@ ingress:
   className: nginx
 
   annotations: {}
-# Monitoring Stack Configurations
-# -----------------------------
-# Loki Distributed
-# -----------------------------
+
 loki-distributed:
   enabled: true
 
